@@ -460,36 +460,16 @@
 
   // Auth
   window.loginGoogle = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      // Try popup first
-      try {
-        const result = await signInWithPopup(auth, provider);
-        if (!ALLOWED_EMAILS.includes(result.user.email)) {
-          await signOut(auth);
-          showToast("Acesso não autorizado.", "error");
-        }
-      } catch(popupError) {
-        // Popup failed, use redirect
-        if (popupError.code === 'auth/popup-blocked' || 
-            popupError.code === 'auth/popup-closed-by-user' ||
-            popupError.code === 'auth/cancelled-popup-request' ||
-            popupError.code === 'auth/operation-not-supported-in-this-environment') {
-          await signInWithRedirect(auth, provider);
-        } else {
-          throw popupError;
-        }
-      }
-    } catch(e) {
-      console.error("Login error:", e.code, e.message);
-      showToast("Erro ao fazer login: " + (e.code || e.message), "error");
-    }
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    // Always use redirect - most compatible with GitHub Pages and mobile
+    await signInWithRedirect(auth, provider);
   };
 
-  // Handle redirect result on page load
+  // Handle redirect result - runs every page load
   getRedirectResult(auth).then(result => {
     if (result && result.user) {
+      console.log("Redirect login success:", result.user.email);
       if (!ALLOWED_EMAILS.includes(result.user.email)) {
         signOut(auth);
         showToast("Acesso não autorizado.", "error");
@@ -497,6 +477,10 @@
     }
   }).catch(e => {
     console.error("Redirect result error:", e.code, e.message);
+    if (e.code === 'auth/missing-initial-state') {
+      // Session storage issue - show helpful message
+      showToast("Ative cookies no navegador para fazer login.", "error");
+    }
   });
   window.logout = async () => {
     if (unsubscribe) unsubscribe();
