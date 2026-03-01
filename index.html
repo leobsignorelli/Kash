@@ -463,13 +463,31 @@
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithRedirect(auth, provider);
+      // Try popup first
+      try {
+        const result = await signInWithPopup(auth, provider);
+        if (!ALLOWED_EMAILS.includes(result.user.email)) {
+          await signOut(auth);
+          showToast("Acesso não autorizado.", "error");
+        }
+      } catch(popupError) {
+        // Popup failed, use redirect
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request' ||
+            popupError.code === 'auth/operation-not-supported-in-this-environment') {
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupError;
+        }
+      }
     } catch(e) {
-      showToast("Erro ao fazer login.", "error");
+      console.error("Login error:", e.code, e.message);
+      showToast("Erro ao fazer login: " + (e.code || e.message), "error");
     }
   };
 
-  // Handle redirect result
+  // Handle redirect result on page load
   getRedirectResult(auth).then(result => {
     if (result && result.user) {
       if (!ALLOWED_EMAILS.includes(result.user.email)) {
